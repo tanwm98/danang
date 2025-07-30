@@ -5,8 +5,8 @@ import numpy as np
 import gradio as gr
 from PIL import Image
 
-# 1. SIMPLE TRAINING SCRIPT
-class SimplePestClassifier:
+# 1. CUSTOM CNN TRAINING SCRIPT
+class CustomPestClassifier:
     def __init__(self, data_dir, img_size=(160, 160)):
         self.data_dir = data_dir
         self.img_size = img_size
@@ -49,45 +49,94 @@ class SimplePestClassifier:
         
         return self.train_ds, self.val_ds
     
-    def build_mobilenetv2_model(self):
-        """Build simple MobileNetV2 model"""
+    def build_custom_cnn(self):
+        """Build custom CNN from scratch - no pre-trained weights"""
         
-        # Load MobileNetV2
-        base_model = keras.applications.MobileNetV2(
-            weights='imagenet',
-            include_top=False,
-            input_shape=(*self.img_size, 3)
-        )
+        print("🏗️ Building custom CNN from scratch...")
         
-        # Freeze base model (no fine-tuning)
-        base_model.trainable = False
-        
-        # Simple head
         self.model = keras.Sequential([
-            base_model,
-            layers.GlobalAveragePooling2D(),
-            layers.Dropout(0.2),
+            # Input layer
+            layers.Input(shape=(*self.img_size, 3)),
+            
+            # First Conv Block
+            layers.Conv2D(32, (3, 3), activation='relu', padding='same'),
+            layers.BatchNormalization(),
+            layers.Conv2D(32, (3, 3), activation='relu', padding='same'),
+            layers.MaxPooling2D((2, 2)),
+            layers.Dropout(0.25),
+            
+            # Second Conv Block
+            layers.Conv2D(64, (3, 3), activation='relu', padding='same'),
+            layers.BatchNormalization(),
+            layers.Conv2D(64, (3, 3), activation='relu', padding='same'),
+            layers.MaxPooling2D((2, 2)),
+            layers.Dropout(0.25),
+            
+            # Third Conv Block
+            layers.Conv2D(128, (3, 3), activation='relu', padding='same'),
+            layers.BatchNormalization(),
+            layers.Conv2D(128, (3, 3), activation='relu', padding='same'),
+            layers.MaxPooling2D((2, 2)),
+            layers.Dropout(0.25),
+            
+            # Fourth Conv Block
+            layers.Conv2D(256, (3, 3), activation='relu', padding='same'),
+            layers.BatchNormalization(),
+            layers.Conv2D(256, (3, 3), activation='relu', padding='same'),
+            layers.MaxPooling2D((2, 2)),
+            layers.Dropout(0.25),
+            
+            # Dense layers
+            layers.Flatten(),
+            layers.Dense(512, activation='relu'),
+            layers.BatchNormalization(),
+            layers.Dropout(0.5),
+            layers.Dense(256, activation='relu'),
+            layers.Dropout(0.3),
             layers.Dense(len(self.class_names), activation='softmax')
         ])
         
         # Compile
         self.model.compile(
-            optimizer='adam',
+            optimizer=keras.optimizers.Adam(learning_rate=0.001),
             loss='categorical_crossentropy',
             metrics=['accuracy']
         )
         
-        print(f"Model built with {self.model.count_params():,} parameters")
+        print(f"✅ Custom CNN built with {self.model.count_params():,} parameters")
+        
+        # Print model architecture
+        print("\n📋 Model Architecture:")
+        self.model.summary()
+        
         return self.model
     
-    def train_simple(self, epochs=5):
-        """Simple training - no fine-tuning, max 5 epochs"""
+    def train_from_scratch(self, epochs=20):
+        """Train custom CNN from scratch (needs more epochs)"""
         
-        print(f"🚀 Starting simple training for {epochs} epochs...")
+        print(f"🚀 Training custom CNN from scratch for {epochs} epochs...")
+        print("⏰ This will take longer since we're not using pre-trained weights")
         
-        # Simple callback
+        # More comprehensive callbacks for scratch training
         callbacks = [
-            keras.callbacks.EarlyStopping(patience=2, restore_best_weights=True)
+            keras.callbacks.EarlyStopping(
+                patience=5, 
+                restore_best_weights=True,
+                monitor='val_accuracy'
+            ),
+            keras.callbacks.ReduceLROnPlateau(
+                monitor='val_loss',
+                factor=0.3,
+                patience=3,
+                min_lr=1e-7,
+                verbose=1
+            ),
+            keras.callbacks.ModelCheckpoint(
+                'custom_pest_model.h5',
+                save_best_only=True,
+                monitor='val_accuracy',
+                verbose=1
+            )
         ]
         
         # Train
@@ -99,9 +148,9 @@ class SimplePestClassifier:
             verbose=1
         )
         
-        # Save model
-        self.model.save('simple_pest_model.h5')
-        print("✅ Model saved as 'simple_pest_model.h5'")
+        # Save final model
+        self.model.save('custom_pest_model.h5')
+        print("✅ Custom model saved as 'custom_pest_model.h5'")
         
         return history
 
@@ -122,7 +171,7 @@ TREATMENTS = {
 }
 
 # 3. SIMPLE GRADIO INTERFACE
-class SimplePestApp:
+class CustomPestApp:
     def __init__(self, model_path):
         self.model = keras.models.load_model(model_path)
         self.class_names = ['Ants', 'Bees', 'Beetles', 'Caterpillars', 'Earthworms', 
@@ -145,134 +194,202 @@ class SimplePestApp:
         confidence = predictions[0][predicted_idx]
         predicted_pest = self.class_names[predicted_idx]
         
+        # Get top 3 predictions
+        top_3_idx = np.argsort(predictions[0])[-3:][::-1]
+        
         # Results
-        result = f"**Detected:** {predicted_pest} ({confidence:.1%} confidence)"
-        treatment = f"**Treatment:** {TREATMENTS.get(predicted_pest, 'No treatment info')}"
+        result = f"**🎯 Primary Detection:** {predicted_pest} ({confidence:.1%} confidence)\n\n"
+        result += "**📊 Top 3 Predictions:**\n"
+        for i, idx in enumerate(top_3_idx, 1):
+            pest = self.class_names[idx]
+            conf = predictions[0][idx]
+            result += f"{i}. {pest}: {conf:.1%}\n"
+        
+        treatment = f"**🌿 Organic Treatment:** {TREATMENTS.get(predicted_pest, 'No treatment info')}"
         
         return result, treatment
     
     def create_interface(self):
         """Simple Gradio interface"""
         
-        with gr.Blocks(title="🐛 Simple Pest Identifier") as app:
-            gr.Markdown("# 🐛 Simple Pest Identifier")
+        with gr.Blocks(title="🐛 Custom CNN Pest Identifier") as app:
+            gr.Markdown("""
+            # 🐛 Custom CNN Pest Identifier
+            ## 🧠 Built from Scratch - No Pre-trained Weights!
+            
+            Upload a pest photo to get identification and organic treatment advice.
+            """)
             
             with gr.Row():
-                image_input = gr.Image(label="Upload Pest Photo", type="pil")
+                image_input = gr.Image(label="📸 Upload Pest Photo", type="pil")
                 
                 with gr.Column():
-                    result_output = gr.Markdown(label="Detection Result")
-                    treatment_output = gr.Markdown(label="Treatment")
+                    result_output = gr.Markdown(label="🔍 Detection Results")
+                    treatment_output = gr.Markdown(label="🌿 Treatment Advice")
             
-            identify_btn = gr.Button("Identify Pest", variant="primary")
+            identify_btn = gr.Button("🔍 Identify Pest", variant="primary", size="lg")
             
             identify_btn.click(
                 fn=self.predict,
                 inputs=[image_input],
                 outputs=[result_output, treatment_output]
             )
+            
+            gr.Markdown("""
+            ---
+            ### 📋 Supported Pest Types
+            Ants • Bees • Beetles • Caterpillars • Earthworms • Earwigs • 
+            Grasshoppers • Moths • Slugs • Snails • Wasps • Weevils
+            
+            ### 🧠 Model Info
+            - **Architecture**: Custom CNN built from scratch
+            - **No Transfer Learning**: Trained entirely on your pest dataset
+            - **Input Size**: 160x160 pixels
+            """)
         
         return app
 
 # 4. SIMPLE USAGE FUNCTIONS
 
-def train_simple():
-    """Simple training function"""
+def train_custom():
+    """Train custom CNN from scratch"""
     
-    print("🚀 Simple MobileNetV2 training (max 5 epochs, no fine-tuning)")
+    print("🚀 Custom CNN Training from Scratch")
+    print("📝 No pre-trained weights - building everything from ground up!")
     
     # Initialize
-    classifier = SimplePestClassifier(data_dir="dataset")
+    classifier = CustomPestClassifier(data_dir="dataset")
     
     # Prepare data
     print("📊 Preparing data...")
     train_ds, val_ds = classifier.prepare_data()
     
-    # Build model
-    print("🏗️ Building MobileNetV2...")
-    model = classifier.build_mobilenetv2_model()
+    # Build custom model
+    print("🏗️ Building custom CNN...")
+    model = classifier.build_custom_cnn()
     
-    # Train (max 5 epochs)
-    history = classifier.train_simple(epochs=5)
+    # Train from scratch (needs more epochs)
+    history = classifier.train_from_scratch(epochs=20)
     
-    print("✅ Done!")
+    print("✅ Custom training complete!")
     return history
 
-def check_model_status():
-    """Check if trained model exists and show info"""
+def launch_custom_app():
+    """Launch custom CNN app"""
+    
+    import os
+    if not os.path.exists('custom_pest_model.h5'):
+        print("❌ No custom model found! Run train_custom() first.")
+        return
+    
+    print("🚀 Launching Custom CNN Pest App...")
+    print("   🧠 Using your custom-built CNN (no pre-trained weights)")
+    print("   🌐 App will open in your default browser")
+    print("   📱 Upload pest images to test!")
+    
+    app = CustomPestApp('custom_pest_model.h5')
+    interface = app.create_interface()
+    interface.launch(share=True)
+
+def check_custom_model_status():
+    """Check if custom trained model exists and show info"""
     
     import os
     from datetime import datetime
     
-    if os.path.exists('simple_pest_model.h5'):
-        model_size = os.path.getsize('simple_pest_model.h5') / (1024*1024)
-        mod_time = datetime.fromtimestamp(os.path.getmtime('simple_pest_model.h5'))
+    if os.path.exists('custom_pest_model.h5'):
+        model_size = os.path.getsize('custom_pest_model.h5') / (1024*1024)
+        mod_time = datetime.fromtimestamp(os.path.getmtime('custom_pest_model.h5'))
         
-        print("✅ Trained model found!")
+        print("✅ Custom CNN model found!")
+        print(f"   🧠 Type: Custom CNN (built from scratch)")
         print(f"   📊 Size: {model_size:.1f}MB")
         print(f"   📅 Created: {mod_time.strftime('%Y-%m-%d %H:%M:%S')}")
         print("   🚀 Ready to launch app!")
         return True
     else:
-        print("❌ No trained model found")
-        print("   🏃 Need to run training first")
+        print("❌ No custom model found")
+        print("   🏗️ Need to run custom training first")
         return False
 
-def launch_simple_app():
-    """Launch simple app"""
-    
-    import os
-    if not os.path.exists('simple_pest_model.h5'):
-        print("❌ No model found! Run train_simple() first.")
-        return
-    
-    print("🚀 Launching Simple Pest App...")
-    print("   🌐 App will open in your default browser")
-    print("   📱 Upload pest images to test!")
-    
-    app = SimplePestApp('simple_pest_model.h5')
-    interface = app.create_interface()
-    interface.launch(share=True)
-
-def run_simple_pipeline(force_retrain=False):
-    """Smart pipeline: Check for model, train if needed, then launch"""
+def run_custom_pipeline(force_retrain=False):
+    """Smart pipeline for custom CNN: Check for model, train if needed, then launch"""
     
     import os
     from datetime import datetime
     
-    print("🎯 Smart Pipeline: Check Model → Train (if needed) → Launch App")
+    print("🎯 Custom CNN Pipeline: Check Model → Train (if needed) → Launch App")
     
     # Check if model already exists
-    if os.path.exists('simple_pest_model.h5') and not force_retrain:
+    if os.path.exists('custom_pest_model.h5') and not force_retrain:
         # Get model info
-        model_size = os.path.getsize('simple_pest_model.h5') / (1024*1024)  # MB
-        mod_time = datetime.fromtimestamp(os.path.getmtime('simple_pest_model.h5'))
+        model_size = os.path.getsize('custom_pest_model.h5') / (1024*1024)  # MB
+        mod_time = datetime.fromtimestamp(os.path.getmtime('custom_pest_model.h5'))
         
-        print(f"✅ Found existing model 'simple_pest_model.h5'")
+        print(f"✅ Found existing custom CNN model 'custom_pest_model.h5'")
+        print(f"   🧠 Type: Custom CNN (no pre-trained weights)")
         print(f"   📊 Size: {model_size:.1f}MB")
         print(f"   📅 Created: {mod_time.strftime('%Y-%m-%d %H:%M:%S')}")
         print("⏭️ Skipping training - launching app directly...")
         print("   💡 Tip: Use force_retrain=True to retrain anyway")
         
-        launch_simple_app()
+        launch_custom_app()
     else:
-        if force_retrain and os.path.exists('simple_pest_model.h5'):
-            print("🔄 Force retrain requested - training new model...")
+        if force_retrain and os.path.exists('custom_pest_model.h5'):
+            print("🔄 Force retrain requested - training new custom model...")
         else:
-            print("❌ No existing model found")
+            print("❌ No existing custom model found")
         
-        print("🚀 Training new MobileNetV2 model...")
-        train_simple()
+        print("🚀 Training new custom CNN from scratch...")
+        print("⏰ This will take longer (~20 epochs) since no pre-trained weights")
+        train_custom()
         print("🚀 Training complete! Launching app...")
-        launch_simple_app()
+        launch_custom_app()
 
-# SMART USAGE
+def visualize_model_architecture():
+    """Show the custom CNN architecture"""
+    
+    print("🧠 Creating model to show architecture...")
+    classifier = CustomPestClassifier(data_dir="dataset")
+    model = classifier.build_custom_cnn()
+    
+    print("\n" + "="*60)
+    print("🏗️ CUSTOM CNN ARCHITECTURE")
+    print("="*60)
+    print("Built from scratch - no pre-trained weights!")
+    print("="*60)
+    
+    # Show detailed summary
+    model.summary()
+    
+    # Show layer breakdown
+    print("\n📊 Layer Breakdown:")
+    conv_layers = 0
+    dense_layers = 0
+    dropout_layers = 0
+    
+    for layer in model.layers:
+        if isinstance(layer, layers.Conv2D):
+            conv_layers += 1
+        elif isinstance(layer, layers.Dense):
+            dense_layers += 1
+        elif isinstance(layer, layers.Dropout):
+            dropout_layers += 1
+    
+    print(f"   • Convolutional layers: {conv_layers}")
+    print(f"   • Dense layers: {dense_layers}")
+    print(f"   • Dropout layers: {dropout_layers}")
+    print(f"   • Total parameters: {model.count_params():,}")
+    print(f"   • Trainable parameters: {model.count_params():,} (all of them!)")
+
+# CUSTOM CNN USAGE
 if __name__ == "__main__":
-    # Smart pipeline - automatically detects existing model!
-    run_simple_pipeline()
+    # Smart pipeline for custom CNN - automatically detects existing model!
+    run_custom_pipeline()
     
     # Other options:
-    # check_model_status()                    # Check if model exists
-    # run_simple_pipeline(force_retrain=True) # Force retrain
-    # launch_simple_app()                     # Just launch app
-    # train_simple()                          # Just train model
+    # visualize_model_architecture()          # Show model architecture
+    # check_custom_model_status()             # Check if custom model exists
+    # run_custom_pipeline(force_retrain=True) # Force retrain custom CNN
+    # launch_custom_app()                     # Just launch app
+    # train_custom()                          # Just train custom model
