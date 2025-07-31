@@ -858,6 +858,6 @@ def run_mobilenetv2_pipeline(force_retrain=False):
 
 # MOBILENETV2 USAGE
 if __name__ == "__main__":
-    run_mobilenetv2_pipeline(force_retrain=True)
+    run_mobilenetv2_pipeline(force_retrain=False)
     # launch_mobilenetv2_app()                         # Just launch app
     # train_mobilenetv2()                              # Just train model
