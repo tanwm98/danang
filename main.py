@@ -10,10 +10,11 @@ import tempfile
 import shutil
 from sklearn.metrics import classification_report
 from datetime import datetime
-import shutil
+import requests
+import json
 
 
-# 1. MOBILENETV2 TRAINING SCRIPT
+# 1. MOBILENETV2 TRAINING SCRIPT (unchanged)
 class CustomPestClassifier:
     def __init__(self, data_dir, img_size=(224, 224)):
         self.data_dir = data_dir
@@ -282,388 +283,144 @@ class CustomPestClassifier:
         except Exception as e:
             print(f"⚠️ Could not clean up temp dirs: {e}")
 
-# 2. SIMPLE TREATMENT DATABASE
-# 2. ENHANCED TREATMENT DATABASE - More Human-Readable
-TREATMENTS = {
-    'Ants': {
-        'description': '🐜 Small social insects commonly found in soil and on plants. They often protect aphids to harvest their sweet honeydew.',
-        'impact': '⚠️ **Potential Problem**: May protect aphids and other harmful pests, indirectly damaging your crops.',
-        'severity': 'Low to Medium',
-        'beneficial': False,
-        'treatments': {
-            'immediate': [
-                '☕ Sprinkle used coffee grounds around affected plants',
-                '🌶️ Create a cinnamon barrier around plant bases',
-                '🔥 Pour boiling water directly on ant trails (be careful not to damage plants)'
-            ],
-            'preventive': [
-                '🌿 Apply food-grade diatomaceous earth around entry points',
-                '🧽 Keep area clean of food debris',
-                '💧 Fix any moisture problems that attract ants'
-            ]
-        },
-        'when_to_treat': 'Only treat if ants are actively protecting aphids or other pests',
-        'safety_notes': '✅ These methods are safe for humans, pets, and beneficial insects',
-        'success_tips': 'Focus on breaking the trail rather than killing individual ants'
-    },
-    
-    'Aphids': {
-        'description': '🦟 Tiny, soft-bodied insects (green, black, or white) that cluster on leaf undersides and new growth.',
-        'impact': '🚨 **High Threat**: Suck plant juices causing stunted growth, yellowing leaves, and can spread plant diseases.',
-        'severity': 'High',
-        'beneficial': False,
-        'treatments': {
-            'immediate': [
-                '🚿 Blast off with strong water spray (repeat every 2-3 days)',
-                '🧼 Apply insecticidal soap spray (2 tbsp dish soap per quart water)',
-                '🌿 Spray neem oil solution in evening (avoid hot sunny days)'
-            ],
-            'biological': [
-                '🐞 Release ladybugs (purchase from garden center)',
-                '🦋 Attract lacewings with flowering plants nearby',
-                '🌸 Plant companion flowers like marigolds and nasturtiums'
-            ],
-            'homemade': [
-                '🧄 Garlic spray: blend 3 cloves garlic + 1 cup water, strain and spray',
-                '🌶️ Chili spray: steep 1 tsp cayenne in 1 cup warm water for 30 minutes'
-            ]
-        },
-        'when_to_treat': 'At first sign of infestation - check plants daily during spring/summer',
-        'safety_notes': '⚠️ Apply treatments in evening to avoid harming beneficial insects',
-        'success_tips': 'Consistency is key - treat every 3-5 days until population decreases'
-    },
-    
-    'Bees': {
-        'description': '🐝 Essential pollinators with fuzzy bodies and pollen baskets on their legs.',
-        'impact': '🌟 **HERO INSECTS**: Absolutely crucial for pollinating crops and maintaining biodiversity.',
-        'severity': 'BENEFICIAL',
-        'beneficial': True,
-        'treatments': {
-            'support': [
-                '🏡 Provide shallow water dishes with landing spots (stones/sticks)',
-                '🌺 Plant bee-friendly flowers: sunflowers, lavender, wildflowers',
-                '🚫 NEVER use pesticides when bees are active',
-                '🍯 Contact local beekeepers if you find a swarm (they\'ll relocate safely)'
-            ]
-        },
-        'when_to_treat': 'NEVER TREAT - Always protect and support!',
-        'safety_notes': '🛡️ If allergic to bee stings, maintain distance but still protect them',
-        'success_tips': 'A garden with happy bees is a productive garden!'
-    },
-    
-    'Beetles': {
-        'description': '🪲 Hard-shelled insects including cucumber beetles, Japanese beetles, and Colorado potato beetles.',
-        'impact': '🚨 **Moderate to High Threat**: Chew holes in leaves, stems, fruits and can spread bacterial diseases.',
-        'severity': 'Medium to High',
-        'beneficial': False,
-        'treatments': {
-            'immediate': [
-                '👋 Hand-pick beetles in early morning when they\'re sluggish',
-                '🌿 Spray neem oil weekly (organic and safe)',
-                '🥒 Use yellow sticky traps to catch flying beetles'
-            ],
-            'physical': [
-                '🛡️ Cover young plants with floating row covers until flowering',
-                '🌾 Use fine mesh or cheesecloth barriers',
-                '💧 Shake beetles into soapy water bucket in morning'
-            ],
-            'cultural': [
-                '🔄 Rotate crops yearly to break beetle life cycles',
-                '🧹 Remove plant debris where beetles overwinter',
-                '🌱 Plant trap crops (beetles prefer some plants over others)'
-            ]
-        },
-        'when_to_treat': 'Start treatment at first beetle sighting - they multiply quickly',
-        'safety_notes': '✅ Hand-picking and neem oil are completely safe methods',
-        'success_tips': 'Early morning treatment is most effective when beetles are less active'
-    },
-    
-    'Caterpillars': {
-        'description': '🐛 Soft-bodied larvae of moths and butterflies, often green or striped, with chewing mouthparts.',
-        'impact': '⚠️ **Variable Threat**: Can chew large holes in leaves and fruits, but some become beneficial butterflies.',
-        'severity': 'Medium',
-        'beneficial': 'Mixed',
-        'treatments': {
-            'targeted': [
-                '🦠 Apply Bt spray (Bacillus thuringiensis) - targets only caterpillars, safe for everything else',
-                '👋 Hand-pick and relocate to wild plants (if you want to save them)',
-                '🕸️ Look for and preserve beneficial parasitic wasp cocoons'
-            ],
-            'natural': [
-                '🐦 Encourage birds with bird houses and water sources',
-                '🌸 Plant flowers that attract parasitic wasps',
-                '🔍 Check plants daily for early detection'
-            ]
-        },
-        'when_to_treat': 'Treat when caterpillars are small (easier to control)',
-        'safety_notes': '🌟 Bt is completely safe for humans, pets, and beneficial insects',
-        'success_tips': 'Identify the caterpillar first - some become beautiful beneficial butterflies!'
-    },
-    
-    'Earthworms': {
-        'description': '🪱 Segmented soil-dwelling decomposers that are absolutely essential for healthy soil.',
-        'impact': '🌟 **GARDEN HEROES**: Aerate soil, create nutrient-rich castings, and improve soil structure.',
-        'severity': 'EXTREMELY BENEFICIAL',
-        'beneficial': True,
-        'treatments': {
-            'support': [
-                '🍂 Add organic matter like compost and leaf mulch',
-                '💧 Keep soil consistently moist but not waterlogged',
-                '🚫 NEVER use chemical fertilizers or pesticides',
-                '🌱 Minimize soil disturbance and digging'
-            ]
-        },
-        'when_to_treat': 'NEVER TREAT - Protect at all costs!',
-        'safety_notes': '🛡️ Earthworms indicate healthy soil - their presence is a great sign',
-        'success_tips': 'More earthworms = healthier, more productive soil!'
-    },
-    
-    'Earwigs': {
-        'description': '🦂 Brown insects with prominent pincers (forceps) at their rear end, active at night.',
-        'impact': '⚖️ **Mixed Impact**: May eat seedlings and soft fruits, but also consume many harmful pests.',
-        'severity': 'Low',
-        'beneficial': 'Mixed',
-        'treatments': {
-            'trapping': [
-                '📰 Roll up damp newspaper, place near plants overnight, shake out in morning',
-                '🥫 Set up cardboard tube traps filled with straw',
-                '🍺 Create shallow beer traps (they\'re attracted to yeast)'
-            ],
-            'habitat_modification': [
-                '🌞 Keep mulch dry and away from plant stems',
-                '🧹 Remove hiding places like boards and debris',
-                '💧 Water plants in morning so soil is drier at night'
-            ]
-        },
-        'when_to_treat': 'Only if they\'re causing visible damage - often they\'re helping by eating pests',
-        'safety_notes': '✅ These methods don\'t harm other beneficial insects',
-        'success_tips': 'Monitor for a week before treating - they might be helping more than harming'
-    },
-    
-    'Grasshoppers': {
-        'description': '🦗 Jumping insects with powerful hind legs and strong chewing mouthparts.',
-        'impact': '🚨 **High Threat**: Can consume large amounts of foliage quickly, especially in groups.',
-        'severity': 'High',
-        'beneficial': False,
-        'treatments': {
-            'physical': [
-                '🛡️ Cover seedlings with lightweight row covers',
-                '🕳️ Create trenches around garden beds (they can\'t jump out)',
-                '🧤 Hand-pick early in morning when they\'re sluggish'
-            ],
-            'natural_predators': [
-                '🐓 Encourage chickens or guinea fowl if you have space',
-                '🐦 Attract birds with feeders and water sources',
-                '🕷️ Preserve spider habitats'
-            ],
-            'repellent': [
-                '🧄 Garlic spray: blend 3 cloves + 1 tsp soap + 1 quart water',
-                '🌶️ Hot pepper spray mixed with a few drops of dish soap'
-            ]
-        },
-        'when_to_treat': 'Prevention is key - treat at first sign before populations explode',
-        'safety_notes': '✅ All methods are safe for humans and beneficial insects',
-        'success_tips': 'Grasshopper swarms are hard to control - focus on prevention and barriers'
-    },
-    
-    'Moths': {
-        'description': '🦋 Nocturnal flying insects; while adults may seem harmless, they lay eggs that become destructive caterpillars.',
-        'impact': '⚠️ **Indirect Threat**: Adults lay eggs that hatch into crop-damaging caterpillars.',
-        'severity': 'Medium',
-        'beneficial': False,
-        'treatments': {
-            'disruption': [
-                '💕 Use pheromone traps to disrupt mating cycles',
-                '💡 Set up light traps away from crops to draw them away',
-                '🌙 Time outdoor lighting to minimize attraction'
-            ],
-            'natural_control': [
-                '🦇 Encourage bats with bat houses (they eat thousands of insects nightly)',
-                '🕷️ Preserve spider webs and habitats',
-                '🌸 Plant flowers that attract parasitic wasps'
-            ]
-        },
-        'when_to_treat': 'Monitor closely during warm seasons when they\'re most active',
-        'safety_notes': '🌟 Focus on prevention rather than direct killing',
-        'success_tips': 'Adult moth control prevents the next generation of caterpillar damage'
-    },
-    
-    'Slugs': {
-        'description': '🐌 Soft-bodied mollusks without shells that love moisture and feed at night.',
-        'impact': '🚨 **Moderate Threat**: Chew irregular holes in leaves, fruits, and can destroy seedlings overnight.',
-        'severity': 'Medium',
-        'beneficial': False,
-        'treatments': {
-            'barriers': [
-                '🥉 Create copper tape barriers around raised beds',
-                '🥚 Sprinkle crushed eggshells around plants',
-                '🧂 Use food-grade diatomaceous earth (reapply after rain)'
-            ],
-            'traps': [
-                '🍺 Set shallow beer traps (they drown in it)',
-                '🥬 Use grapefruit rinds as hiding spots, collect in morning',
-                '📋 Place boards near plants, flip and collect slugs underneath'
-            ],
-            'environmental': [
-                '🌅 Water plants in early morning instead of evening',
-                '🌞 Improve drainage to reduce moisture',
-                '🧹 Remove hiding places like debris and dense vegetation'
-            ]
-        },
-        'when_to_treat': 'Best treated at night when they\'re active, or early morning',
-        'safety_notes': '⚠️ Iron phosphate pellets are safer than metaldehyde if you choose commercial baits',
-        'success_tips': 'Reducing moisture at night dramatically reduces slug problems'
-    },
-    
-    'Snails': {
-        'description': '🐌 Similar to slugs but with protective shells, also moisture-loving and nocturnal.',
-        'impact': '🚨 **Moderate Threat**: Feed on leafy greens, fruits, and flowers, leaving slime trails.',
-        'severity': 'Medium',
-        'beneficial': False,
-        'treatments': {
-            'physical_removal': [
-                '👋 Hand-pick in early morning or evening with flashlight',
-                '🏺 Drop collected snails in soapy water',
-                '🚚 Relocate to wild areas away from garden'
-            ],
-            'barriers': [
-                '🥚 Create barriers with crushed eggshells',
-                '🏖️ Use coarse sand around plant bases',
-                '🥉 Install copper strips around garden beds'
-            ],
-            'habitat_modification': [
-                '🧹 Remove debris, boards, and hiding spots',
-                '✂️ Trim vegetation to reduce cool, moist hiding places',
-                '🌞 Improve air circulation around plants'
-            ]
-        },
-        'when_to_treat': 'Evening treatment is most effective when snails are active',
-        'safety_notes': '✅ Hand-picking and barriers are completely safe methods',
-        'success_tips': 'Consistency in habitat modification prevents re-infestation'
-    },
-    
-    'Wasps': {
-        'description': '🐝 Predatory flying insects with narrow waists that hunt other insects for food.',
-        'impact': '🌟 **BENEFICIAL PREDATORS**: Eat many harmful garden pests including caterpillars and aphids.',
-        'severity': 'BENEFICIAL',
-        'beneficial': True,
-        'treatments': {
-            'coexistence': [
-                '🏡 Only remove nests if they pose immediate threat to human safety',
-                '👥 Contact professional pest control for nest removal if necessary',
-                '🌸 Provide flowering plants to support beneficial wasps',
-                '💧 Offer shallow water sources away from high-traffic areas'
-            ]
-        },
-        'when_to_treat': 'Generally avoid treatment - they\'re valuable pest controllers',
-        'safety_notes': '⚠️ If allergic to stings, maintain respectful distance but don\'t eliminate them',
-        'success_tips': 'Wasps are your garden\'s natural pest control team!'
-    },
-    
-    'Weevils': {
-        'description': '🪲 Small beetles with distinctive elongated snouts that damage roots, fruits, and stored grains.',
-        'impact': '🚨 **Moderate to High Threat**: Can damage plant roots, bore into fruits, and ruin stored harvests.',
-        'severity': 'Medium to High',
-        'beneficial': False,
-        'treatments': {
-            'biological': [
-                '🪱 Apply beneficial nematodes to soil (natural weevil predators)',
-                '🕷️ Encourage ground beetles and spiders',
-                '🐦 Attract birds that eat ground-dwelling insects'
-            ],
-            'physical': [
-                '🟡 Use yellow sticky traps for flying adult weevils',
-                '🛡️ Cover plants with row covers during egg-laying season',
-                '👋 Hand-pick adult weevils in early morning'
-            ],
-            'cultural': [
-                '🔄 Rotate crops annually to break life cycles',
-                '🧹 Remove and destroy plant debris after harvest',
-                '❄️ Till soil in fall to expose overwintering larvae to cold'
-            ]
-        },
-        'when_to_treat': 'Start treatment early in growing season before populations establish',
-        'safety_notes': '✅ Beneficial nematodes and cultural controls are completely safe',
-        'success_tips': 'Prevention through crop rotation is more effective than reactive treatment'
-    }
-}
 
-# Enhanced prediction display function
-def format_treatment_info(pest_name, treatment_data):
-    """Format treatment information in a human-readable way"""
-    
-    if not treatment_data:
-        return "No treatment information available for this pest."
-    
-    # Determine emoji based on beneficial status
-    if treatment_data.get('beneficial') == True:
-        header_emoji = "🌟"
-        action_word = "PROTECT"
-    elif treatment_data.get('beneficial') == 'Mixed':
-        header_emoji = "⚖️"
-        action_word = "MONITOR"
-    else:
-        header_emoji = "🎯"
-        action_word = "MANAGE"
-    
-    # Build formatted response
-    response = f"## {header_emoji} {pest_name} - {action_word}\n\n"
-    
-    # Description
-    response += f"**What it is:** {treatment_data.get('description', 'No description available')}\n\n"
-    
-    # Impact
-    response += f"**Garden Impact:** {treatment_data.get('impact', 'Impact unknown')}\n\n"
-    
-    # Severity indicator
-    severity = treatment_data.get('severity', 'Unknown')
-    if severity == 'BENEFICIAL' or severity == 'EXTREMELY BENEFICIAL':
-        response += f"**🌟 Status:** {severity} - Please protect!\n\n"
-    else:
-        response += f"**⚠️ Threat Level:** {severity}\n\n"
-    
-    # Treatment actions
-    treatments = treatment_data.get('treatments', {})
-    if treatments:
-        response += "**🛠️ Recommended Actions:**\n\n"
+# 2. OPENWEBUI API CLIENT WITH AUTHENTICATION
+class OpenWebUIClient:
+    def __init__(self, base_url="http://localhost:3000", model="pest-management", email=None, password=None):
+        self.base_url = base_url.rstrip('/')
+        self.model = model
+        self.email = email
+        self.password = password
+        self.api_endpoint = f"{self.base_url}/ollama/api/chat"
+        self.auth_endpoint = f"{self.base_url}/api/v1/auths/signin"
+        self.token = None
+        self.headers = {"Content-Type": "application/json"}
         
-        for category, actions in treatments.items():
-            if actions:  # Only show categories that have actions
-                category_name = category.replace('_', ' ').title()
-                response += f"**{category_name}:**\n"
-                for action in actions:
-                    response += f"• {action}\n"
-                response += "\n"
+        # Authenticate if credentials provided
+        if email and password:
+            self.authenticate()
     
-    # When to treat
-    when_to_treat = treatment_data.get('when_to_treat')
-    if when_to_treat:
-        response += f"**⏰ When to Act:** {when_to_treat}\n\n"
+    def authenticate(self):
+        """Authenticate with OpenWebUI and get JWT token"""
+        auth_payload = {
+            "email": self.email,
+            "password": self.password
+        }
+        
+        try:
+            print(f"🔐 Authenticating with OpenWebUI as {self.email}...")
+            
+            response = requests.post(
+                self.auth_endpoint,
+                json=auth_payload,
+                timeout=10,
+                headers={"Content-Type": "application/json"}
+            )
+            
+            if response.status_code == 200:
+                auth_data = response.json()
+                self.token = auth_data.get('token')
+                if self.token:
+                    self.headers["Authorization"] = f"Bearer {self.token}"
+                    print("✅ Authentication successful!")
+                    return True
+                else:
+                    print("❌ No token received in response")
+                    return False
+            else:
+                print(f"❌ Authentication failed (HTTP {response.status_code}): {response.text}")
+                return False
+                
+        except Exception as e:
+            print(f"❌ Authentication error: {str(e)}")
+            return False
     
-    # Safety notes
-    safety_notes = treatment_data.get('safety_notes')
-    if safety_notes:
-        response += f"**🛡️ Safety:** {safety_notes}\n\n"
-    
-    # Success tips
-    success_tips = treatment_data.get('success_tips')
-    if success_tips:
-        response += f"**💡 Pro Tip:** {success_tips}\n\n"
-    
-    return response
+    def get_pest_treatment(self, pest_name, confidence, top_predictions):
+        """Query OpenWebUI for pest treatment advice"""
+        
+        # Construct prompt for the pest management model
+        prompt = f"""I've identified a pest in my garden with the following details:
 
-# Update the predict function in CustomPestApp class
+Primary Detection: {pest_name}
+Confidence Level: {confidence:.1%}
+
+Top 3 possibilities:
+{chr(10).join([f"{i+1}. {pred['name']}: {pred['confidence']:.1%}" for i, pred in enumerate(top_predictions)])}
+
+Please provide comprehensive organic garden pest management advice including:
+- What this pest is and its garden impact
+- Whether it's beneficial or harmful
+- Safe, organic treatment options
+- Best timing for treatment
+- Safety considerations for humans and beneficial insects
+- Prevention strategies
+
+Focus on environmentally friendly, organic methods only. If this is a beneficial insect, emphasize protection rather than elimination."""
+
+        # Prepare API request
+        payload = {
+            "model": self.model,
+            "messages": [
+                {
+                    "role": "user",
+                    "content": prompt
+                }
+            ],
+            "stream": False
+        }
+        
+        try:
+            print(f"🌐 Querying OpenWebUI at {self.api_endpoint}")
+            print(f"   🤖 Model: {self.model}")
+            print(f"   🐛 Pest: {pest_name} ({confidence:.1%} confidence)")
+            
+            response = requests.post(
+                self.api_endpoint,
+                json=payload,
+                timeout=30,
+                headers=self.headers
+            )
+            
+            if response.status_code == 200:
+                result = response.json()
+                if 'message' in result and 'content' in result['message']:
+                    return result['message']['content']
+                else:
+                    return f"❌ Unexpected response format from OpenWebUI: {result}"
+            else:
+                return f"❌ OpenWebUI API error (HTTP {response.status_code}): {response.text}"
+                
+        except requests.exceptions.ConnectionError:
+            return f"""❌ **Could not connect to OpenWebUI**
+
+Please ensure:
+- OpenWebUI is running at {self.base_url}
+- The pest-management model is available
+- No firewall blocking the connection
+
+**Fallback:** Try accessing {self.base_url} directly in your browser to verify it's running."""
+
+        except requests.exceptions.Timeout:
+            return "❌ **Request timed out**\n\nThe OpenWebUI API took too long to respond. This might be because the model is loading or the system is busy."
+
+        except Exception as e:
+            return f"❌ **Unexpected error:** {str(e)}"
+
+
+# 3. UPDATED PEST APP WITH OPENWEBUI INTEGRATION
 class CustomPestApp:
-    def __init__(self, model_path):
+    def __init__(self, model_path, openwebui_url="http://localhost:3000", openwebui_model="pest-management", 
+                 email=None, password=None):
         self.model = keras.models.load_model(model_path)
         self.class_names = ['Ants', 'Bees', 'Beetles', 'Caterpillars', 'Earthworms', 
                            'Earwigs', 'Grasshoppers', 'Moths', 'Slugs', 'Snails', 
                            'Wasps', 'Weevils']
+        self.openwebui_client = OpenWebUIClient(openwebui_url, openwebui_model, email, password)
     
     def predict(self, image):
-        """Enhanced prediction with better formatting"""
+        """Enhanced prediction with OpenWebUI integration"""
         if image is None:
-            return "Please upload an image", ""
+            return "Please upload an image", "Upload an image to get treatment recommendations"
         
         # Preprocess - MUST match training size!
         img = image.resize((224, 224))
@@ -678,8 +435,15 @@ class CustomPestApp:
         
         # Get top 3 predictions
         top_3_idx = np.argsort(predictions[0])[-3:][::-1]
+        top_predictions = []
         
-        # Enhanced results with confidence indicators
+        for idx in top_3_idx:
+            top_predictions.append({
+                'name': self.class_names[idx],
+                'confidence': predictions[0][idx]
+            })
+        
+        # Build identification results
         result = f"# 🎯 Pest Identification Results\n\n"
         result += f"**Primary Detection:** {predicted_pest}\n"
         
@@ -694,33 +458,35 @@ class CustomPestApp:
         result += f"**Confidence:** {confidence:.1%} {conf_indicator}\n\n"
         
         result += "### 📊 Top 3 Possibilities:\n"
-        for i, idx in enumerate(top_3_idx, 1):
-            pest = self.class_names[idx]
-            conf = predictions[0][idx]
-            result += f"{i}. **{pest}**: {conf:.1%}\n"
+        for i, pred in enumerate(top_predictions, 1):
+            result += f"{i}. **{pred['name']}**: {pred['confidence']:.1%}\n"
         
-        # Get detailed treatment info
-        treatment_info = format_treatment_info(predicted_pest, TREATMENTS.get(predicted_pest, {}))
+        # Query OpenWebUI for treatment advice
+        treatment_info = self.openwebui_client.get_pest_treatment(
+            predicted_pest, confidence, top_predictions
+        )
         
         return result, treatment_info
     
     def create_interface(self):
-        """Enhanced Gradio interface with better styling - Fixed white page issue"""
+        """Enhanced Gradio interface with OpenWebUI integration"""
         
         with gr.Blocks(
-            title="🐛 Smart Garden Pest Identifier",
-            theme=gr.themes.Default()  # Use default theme instead of custom CSS
+            title="🐛 Smart Garden Pest Identifier with AI Assistant",
+            theme=gr.themes.Default()
         ) as app:
             
-            gr.Markdown("""
+            gr.Markdown(f"""
             # 🐛 Smart Garden Pest Identifier
-            ## 🧠 AI-Powered Pest Recognition & Organic Treatment Advisor
+            ## 🧠 AI-Powered Pest Recognition & Dynamic Treatment Advisor
             
             **Simply upload a photo of any garden pest to instantly get:**
-            - 🎯 Accurate pest identification
-            - 🌿 Safe, organic treatment options
-            - ⏰ Best timing for treatment
-            - 🛡️ Safety information for you and beneficial insects
+            - 🎯 Accurate pest identification using MobileNetV2
+            - 🤖 AI-powered treatment recommendations from OpenWebUI
+            - 🌿 Personalized organic treatment strategies
+            - ⏰ Optimal timing and safety guidance
+            
+            **🔗 Connected to:** `{self.openwebui_client.base_url}` | **🤖 Model:** `{self.openwebui_client.model}`
             """)
             
             with gr.Row():
@@ -731,7 +497,7 @@ class CustomPestApp:
                     )
                     
                     identify_btn = gr.Button(
-                        "🔍 Identify Pest & Get Treatment Advice", 
+                        "🔍 Identify Pest & Get AI Treatment Advice", 
                         variant="primary"
                     )
                     
@@ -741,6 +507,11 @@ class CustomPestApp:
                     - 🔆 Use good lighting
                     - 🎯 Center the pest in the image
                     - 📏 Include size reference if possible
+                    
+                    **🤖 AI Treatment Advisor:**
+                    - Dynamic responses from OpenWebUI
+                    - Personalized to your specific situation
+                    - Always organic and eco-friendly methods
                     """)
                 
                 with gr.Column(scale=2):
@@ -749,7 +520,7 @@ class CustomPestApp:
                     )
                     
                     treatment_output = gr.Markdown(
-                        value="Treatment recommendations will appear here after identification..."
+                        value="AI treatment recommendations will appear here after identification..."
                     )
             
             # Connect the button to the function
@@ -765,22 +536,22 @@ class CustomPestApp:
             
             **🐛 Common Pests:** Ants • Beetles • Caterpillars • Earwigs • Grasshoppers • Moths • Slugs • Snails • Weevils
             
-            **🌟 Beneficial Insects:** Bees • Earthworms • Wasps *(These are garden helpers - we'll tell you how to protect them!)*
+            **🌟 Beneficial Insects:** Bees • Earthworms • Wasps *(AI will tell you how to protect these garden helpers!)*
             
-            ## 🧠 Technology Behind This Tool
-            - **AI Model:** MobileNetV2 with Transfer Learning
-            - **Training:** ImageNet pre-trained (1.4M images) + Custom pest dataset
-            - **Accuracy:** Optimized for garden pest identification
-            - **Focus:** Organic, safe treatment methods only
+            ## 🧠 Technology Stack
+            - **Vision AI:** MobileNetV2 with ImageNet Transfer Learning
+            - **Treatment AI:** OpenWebUI with specialized pest-management model
+            - **Training:** 1.4M ImageNet images + Custom pest dataset
+            - **Focus:** Organic, safe, environmentally responsible methods
             
             ---
-            *🌿 Remember: Always try the gentlest treatment methods first, and never harm beneficial insects!*
+            *🌿 Powered by AI • Always organic • Beneficial insect friendly*
             """)
         
         return app
 
-# 4. SIMPLE USAGE FUNCTIONS
 
+# 4. USAGE FUNCTIONS (mostly unchanged)
 def train_mobilenetv2():
     """Train MobileNetV2 transfer learning model"""
     
@@ -806,26 +577,31 @@ def train_mobilenetv2():
     
     return history, test_accuracy
 
-def launch_mobilenetv2_app():
-    """Launch MobileNetV2 app"""
+def launch_mobilenetv2_app(openwebui_url="http://localhost:3000", openwebui_model="pest-management",
+                          email=None, password=None):
+    """Launch MobileNetV2 app with OpenWebUI integration"""
     
     if not os.path.exists('mobilenetv2_pest_model.keras'):
         print("❌ No MobileNetV2 model found! Run train_mobilenetv2() first.")
         return
     
-    print("🚀 Launching MobileNetV2 Pest App...")
-    print("   🧠 Using MobileNetV2 + ImageNet transfer learning")
+    print("🚀 Launching MobileNetV2 Pest App with OpenWebUI Integration...")
+    print("   🧠 Vision: MobileNetV2 + ImageNet transfer learning")
+    print(f"   🤖 AI Assistant: {openwebui_url} (model: {openwebui_model})")
+    if email:
+        print(f"   🔐 User: {email}")
     print("   🌐 App will open in your default browser")
     print("   📱 Upload pest images to test!")
     
-    app = CustomPestApp('mobilenetv2_pest_model.keras')
+    app = CustomPestApp('mobilenetv2_pest_model.keras', openwebui_url, openwebui_model, email, password)
     interface = app.create_interface()
     interface.launch(share=True)
 
-def run_mobilenetv2_pipeline(force_retrain=False):
-    """Smart pipeline for MobileNetV2 with train-val-test evaluation"""
+def run_mobilenetv2_pipeline(force_retrain=False, openwebui_url="http://localhost:3000", 
+                            openwebui_model="pest-management", email=None, password=None):
+    """Smart pipeline for MobileNetV2 with OpenWebUI integration"""
     
-    print("🎯 MobileNetV2 Pipeline: Check Model → Train-Val-Test → Launch App")
+    print("🎯 MobileNetV2 + OpenWebUI Pipeline: Check Model → Train-Val-Test → Launch App")
     
     # Check if model already exists
     if os.path.exists('mobilenetv2_pest_model.keras') and not force_retrain:
@@ -837,10 +613,10 @@ def run_mobilenetv2_pipeline(force_retrain=False):
         print(f"   🧠 Type: MobileNetV2 Transfer Learning")
         print(f"   📊 Size: {model_size:.1f}MB")
         print(f"   📅 Created: {mod_time.strftime('%Y-%m-%d %H:%M:%S')}")
-        print("⏭️ Skipping training - launching app directly...")
+        print("⏭️ Skipping training - launching app with OpenWebUI integration...")
         print("   💡 Tip: Use force_retrain=True to retrain anyway")
         
-        launch_mobilenetv2_app()
+        launch_mobilenetv2_app(openwebui_url, openwebui_model, email, password)
     else:
         if force_retrain and os.path.exists('mobilenetv2_pest_model.keras'):
             print("🔄 Force retrain requested - training new MobileNetV2 model...")
@@ -850,14 +626,30 @@ def run_mobilenetv2_pipeline(force_retrain=False):
         try:
             history, test_accuracy = train_mobilenetv2()
             print(f"\n🎉 Training complete! Final test accuracy: {test_accuracy*100:.1f}%")
-            print("🚀 Launching app...")
-            launch_mobilenetv2_app()
+            print("🚀 Launching app with OpenWebUI integration...")
+            launch_mobilenetv2_app(openwebui_url, openwebui_model, email, password)
         except Exception as e:
             print(f"❌ Training failed: {e}")
-            print("💡 Make sure you have scikit-learn installed: pip install scikit-learn")
+            print("💡 Make sure you have required packages: pip install scikit-learn requests")
 
-# MOBILENETV2 USAGE
+# MAIN USAGE
 if __name__ == "__main__":
-    run_mobilenetv2_pipeline(force_retrain=False)
-    # launch_mobilenetv2_app()                         # Just launch app
-    # train_mobilenetv2()                              # Just train model
+    # Run with authentication (replace with your credentials)
+    run_mobilenetv2_pipeline(
+        force_retrain=False,
+        openwebui_url="http://localhost:3000",
+        openwebui_model="pest-management",
+        email="tanwm98@gmail.com",  # Your email
+        password="admin"        # Your password
+    )
+    
+    # Or run without credentials (will fail if auth required):
+    # run_mobilenetv2_pipeline(force_retrain=False)
+    
+    # Just launch app with authentication:
+    # launch_mobilenetv2_app(
+    #     openwebui_url="http://localhost:3000",
+    #     openwebui_model="pest-management",
+    #     email="xxx@gmail.com",
+    #     password="admin"
+    # )
