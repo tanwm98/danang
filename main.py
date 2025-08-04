@@ -284,7 +284,7 @@ class CustomPestClassifier:
             print(f"⚠️ Could not clean up temp dirs: {e}")
 
 
-# 2. OPENWEBUI API CLIENT WITH AUTHENTICATION
+# 2. ENHANCED OPENWEBUI API CLIENT WITH CONVERSATION SUPPORT
 class OpenWebUIClient:
     def __init__(self, base_url="http://localhost:3000", model="pest-management", email=None, password=None):
         self.base_url = base_url.rstrip('/')
@@ -295,6 +295,7 @@ class OpenWebUIClient:
         self.auth_endpoint = f"{self.base_url}/api/v1/auths/signin"
         self.token = None
         self.headers = {"Content-Type": "application/json"}
+        self.conversation_history = []  # Store conversation history
         
         # Authenticate if credentials provided
         if email and password:
@@ -357,15 +358,14 @@ Please provide comprehensive organic garden pest management advice including:
 
 Focus on environmentally friendly, organic methods only. If this is a beneficial insect, emphasize protection rather than elimination."""
 
+        # Clear conversation history for new identification
+        self.conversation_history = []
+        self.conversation_history.append({"role": "user", "content": prompt})
+        
         # Prepare API request
         payload = {
             "model": self.model,
-            "messages": [
-                {
-                    "role": "user",
-                    "content": prompt
-                }
-            ],
+            "messages": self.conversation_history,
             "stream": False
         }
         
@@ -377,14 +377,17 @@ Focus on environmentally friendly, organic methods only. If this is a beneficial
             response = requests.post(
                 self.api_endpoint,
                 json=payload,
-                timeout=30,
+                timeout=300,
                 headers=self.headers
             )
             
             if response.status_code == 200:
                 result = response.json()
                 if 'message' in result and 'content' in result['message']:
-                    return result['message']['content']
+                    assistant_response = result['message']['content']
+                    # Add assistant response to conversation history
+                    self.conversation_history.append({"role": "assistant", "content": assistant_response})
+                    return assistant_response
                 else:
                     return f"❌ Unexpected response format from OpenWebUI: {result}"
             else:
@@ -405,9 +408,50 @@ Please ensure:
 
         except Exception as e:
             return f"❌ **Unexpected error:** {str(e)}"
+    
+    def chat(self, user_message):
+        """Have a conversation with the AI about pest management"""
+        
+        # Add to conversation history
+        self.conversation_history.append({"role": "user", "content": user_message})
+        
+        # Prepare API request
+        payload = {
+            "model": self.model,
+            "messages": self.conversation_history,
+            "stream": False
+        }
+        
+        try:
+            response = requests.post(
+                self.api_endpoint,
+                json=payload,
+                timeout=300,
+                headers=self.headers
+            )
+            
+            if response.status_code == 200:
+                result = response.json()
+                if 'message' in result and 'content' in result['message']:
+                    assistant_response = result['message']['content']
+                    # Add assistant response to conversation history
+                    self.conversation_history.append({"role": "assistant", "content": assistant_response})
+                    return assistant_response
+                else:
+                    return f"❌ Unexpected response format: {result}"
+            else:
+                return f"❌ API error (HTTP {response.status_code}): {response.text}"
+                
+        except Exception as e:
+            return f"❌ Error: {str(e)}"
+    
+    def clear_conversation(self):
+        """Clear conversation history"""
+        self.conversation_history = []
+        return "🔄 Conversation history cleared!"
 
 
-# 3. UPDATED PEST APP WITH OPENWEBUI INTEGRATION
+# 3. ENHANCED PEST APP WITH CONVERSATIONAL INTERFACE
 class CustomPestApp:
     def __init__(self, model_path, openwebui_url="http://localhost:3000", openwebui_model="pest-management", 
                  email=None, password=None):
@@ -468,8 +512,29 @@ class CustomPestApp:
         
         return result, treatment_info
     
+    def chat_with_ai(self, message, chat_history):
+        """Handle chat interaction with AI"""
+        if not message.strip():
+            return chat_history
+        
+        # Add user message to chat history
+        chat_history.append([message, None])
+        
+        # Get AI response
+        ai_response = self.openwebui_client.chat(message)
+        
+        # Update chat history with AI response
+        chat_history[-1][1] = ai_response
+        
+        return chat_history
+    
+    def clear_chat(self):
+        """Clear chat history"""
+        self.openwebui_client.clear_conversation()
+        return []
+    
     def create_interface(self):
-        """Enhanced Gradio interface with OpenWebUI integration"""
+        """Enhanced Gradio interface with integrated conversational capabilities"""
         
         with gr.Blocks(
             title="🐛 Smart Garden Pest Identifier with AI Assistant",
@@ -477,81 +542,156 @@ class CustomPestApp:
         ) as app:
             
             gr.Markdown(f"""
-            # 🐛 Smart Garden Pest Identifier
-            ## 🧠 AI-Powered Pest Recognition & Dynamic Treatment Advisor
+            # 🐛 Smart Garden Pest Identifier with Conversational AI
+            ## 🧠 AI-Powered Pest Recognition & Interactive Treatment Advisor
             
-            **Simply upload a photo of any garden pest to instantly get:**
-            - 🎯 Accurate pest identification using MobileNetV2
-            - 🤖 AI-powered treatment recommendations from OpenWebUI
-            - 🌿 Personalized organic treatment strategies
-            - ⏰ Optimal timing and safety guidance
+            **Simply upload a photo of any garden pest to instantly get identification and chat with our AI expert!**
             
             **🔗 Connected to:** `{self.openwebui_client.base_url}` | **🤖 Model:** `{self.openwebui_client.model}`
             """)
             
+            # Main layout with three columns
             with gr.Row():
+                # Left column - Image upload and identification
                 with gr.Column(scale=1):
+                    gr.Markdown("### 📸 Step 1: Upload & Identify")
+                    
                     image_input = gr.Image(
-                        label="📸 Upload Pest Photo", 
+                        label="Upload Pest Photo", 
                         type="pil"
                     )
                     
                     identify_btn = gr.Button(
                         "🔍 Identify Pest & Get AI Treatment Advice", 
-                        variant="primary"
+                        variant="primary",
+                        size="lg"
+                    )
+                    
+                    result_output = gr.Markdown(
+                        value="Upload an image to see identification results...",
+                        label="Identification Results"
                     )
                     
                     gr.Markdown("""
                     **📋 Tips for Best Results:**
-                    - 📷 Take clear, close-up photos
-                    - 🔆 Use good lighting
-                    - 🎯 Center the pest in the image
-                    - 📏 Include size reference if possible
-                    
-                    **🤖 AI Treatment Advisor:**
-                    - Dynamic responses from OpenWebUI
-                    - Personalized to your specific situation
-                    - Always organic and eco-friendly methods
+                    - 📷 Clear, close-up photos
+                    - 🔆 Good lighting
+                    - 🎯 Center the pest
+                    - 📏 Include size reference
                     """)
                 
-                with gr.Column(scale=2):
-                    result_output = gr.Markdown(
-                        value="Upload an image to see identification results here..."
-                    )
+                # Middle column - Initial treatment recommendations
+                with gr.Column(scale=1):
+                    gr.Markdown("### 📖 Step 2: AI Treatment Advice")
                     
                     treatment_output = gr.Markdown(
-                        value="AI treatment recommendations will appear here after identification..."
+                        value="AI treatment recommendations will appear here after identification...",
+                        label="Treatment Recommendations"
                     )
+                
+                # Right column - Interactive chat
+                with gr.Column(scale=1):
+                    gr.Markdown("### 💬 Step 3: Ask Follow-up Questions")
+                    
+                    chatbot = gr.Chatbot(
+                        label="Chat with AI Pest Expert",
+                        height=400,
+                        bubble_full_width=False,
+                        show_label=False
+                    )
+                    
+                    with gr.Row():
+                        msg_input = gr.Textbox(
+                            label="Your Question",
+                            placeholder="Ask about treatments, timing, safety...",
+                            lines=2,
+                            scale=4,
+                            show_label=False
+                        )
+                        
+                        with gr.Column(scale=1):
+                            submit_btn = gr.Button("📤 Send", size="sm")
+                            clear_btn = gr.Button("🔄 Clear", size="sm")
             
-            # Connect the button to the function
+            # Example questions section below the main interface
+            with gr.Row():
+                gr.Examples(
+                    examples=[
+                        "Is this pest harmful to tomatoes?",
+                        "Best time to apply treatment?",
+                        "Safe for pets and kids?",
+                        "How often to reapply?",
+                        "Natural predators?",
+                        "Companion plants that help?",
+                        "Make homemade spray?",
+                        "Prevent future infestations?",
+                        "Signs of damage to watch for?",
+                        "Indoor vs outdoor treatment?"
+                    ],
+                    inputs=msg_input,
+                    label="💡 Quick Questions - Click to Ask"
+                )
+            
+            # Connect the identification button
             identify_btn.click(
                 fn=self.predict,
                 inputs=[image_input],
                 outputs=[result_output, treatment_output]
             )
             
-            gr.Markdown("""
-            ---
-            ## 🌱 Supported Garden Pest Types
+            # Connect the chat functionality
+            msg_input.submit(
+                fn=self.chat_with_ai,
+                inputs=[msg_input, chatbot],
+                outputs=[chatbot]
+            ).then(
+                fn=lambda: "",
+                outputs=[msg_input]
+            )
             
-            **🐛 Common Pests:** Ants • Beetles • Caterpillars • Earwigs • Grasshoppers • Moths • Slugs • Snails • Weevils
+            submit_btn.click(
+                fn=self.chat_with_ai,
+                inputs=[msg_input, chatbot],
+                outputs=[chatbot]
+            ).then(
+                fn=lambda: "",
+                outputs=[msg_input]
+            )
             
-            **🌟 Beneficial Insects:** Bees • Earthworms • Wasps *(AI will tell you how to protect these garden helpers!)*
+            clear_btn.click(
+                fn=self.clear_chat,
+                outputs=[chatbot]
+            )
             
-            ## 🧠 Technology Stack
-            - **Vision AI:** MobileNetV2 with ImageNet Transfer Learning
-            - **Treatment AI:** OpenWebUI with specialized pest-management model
-            - **Training:** 1.4M ImageNet images + Custom pest dataset
-            - **Focus:** Organic, safe, environmentally responsible methods
-            
-            ---
-            *🌿 Powered by AI • Always organic • Beneficial insect friendly*
-            """)
+            # Information section at the bottom
+            with gr.Accordion("ℹ️ How to Use & Features", open=False):
+                gr.Markdown("""
+                ## 🌱 Simple 3-Step Process
+                
+                1. **📸 Upload** - Take a clear photo of your pest
+                2. **🔍 Identify** - Get instant AI identification with confidence scores
+                3. **💬 Chat** - Ask follow-up questions in the same view
+                
+                ## 🌟 Supported Garden Pest Types
+                
+                **🐛 Common Pests:** Ants • Beetles • Caterpillars • Earwigs • Grasshoppers • Moths • Slugs • Snails • Weevils
+                
+                **🌟 Beneficial Insects:** Bees • Earthworms • Wasps *(AI will tell you how to protect these garden helpers!)*
+                
+                ## 🧠 Technology Stack
+                - **Vision AI:** MobileNetV2 with ImageNet Transfer Learning
+                - **Treatment AI:** OpenWebUI with specialized pest-management model
+                - **Training:** 1.4M ImageNet images + Custom pest dataset
+                - **Focus:** Organic, safe, environmentally responsible methods
+                
+                ---
+                *🌿 Powered by AI • Always organic • Beneficial insect friendly*
+                """)
         
         return app
 
 
-# 4. USAGE FUNCTIONS (mostly unchanged)
+# 4. USAGE FUNCTIONS (original functions preserved)
 def train_mobilenetv2():
     """Train MobileNetV2 transfer learning model"""
     
@@ -639,17 +779,6 @@ if __name__ == "__main__":
         force_retrain=False,
         openwebui_url="http://localhost:3000",
         openwebui_model="pest-management",
-        email="tanwm98@gmail.com",  # Your email
-        password="admin"        # Your password
+        email="lanzexi26@gmail.com",  # Your email
+        password="n9qrM5kKZGCGH33"        # Your password
     )
-    
-    # Or run without credentials (will fail if auth required):
-    # run_mobilenetv2_pipeline(force_retrain=False)
-    
-    # Just launch app with authentication:
-    # launch_mobilenetv2_app(
-    #     openwebui_url="http://localhost:3000",
-    #     openwebui_model="pest-management",
-    #     email="xxx@gmail.com",
-    #     password="admin"
-    # )
